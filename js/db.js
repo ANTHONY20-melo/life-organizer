@@ -145,8 +145,8 @@ const DB = (() => {
       method: (typeof t.method === 'string' ? t.method : '').slice(0, 60),
       installment,
       recurringId: typeof t.recurringId === 'string' ? t.recurringId : null,
-      paid: type === 'expense' ? t.paid === true : true,
-      status: ['paid', 'pending', 'overdue', 'scheduled'].includes(t.status) ? t.status : (type === 'expense' ? 'pending' : 'paid'),
+      paid: type === 'expense' ? t.paid === true || t.paid === 'true' : true,
+      status: ['paid', 'pending', 'overdue', 'scheduled'].includes(t.status) ? t.status : (type === 'expense' ? (t.paid === true || t.paid === 'true' ? 'paid' : 'pending') : 'paid'),
       observations: (typeof t.observations === 'string' ? t.observations : '').slice(0, 1000),
       createdAt: t.createdAt || nowISO(),
       updatedAt: t.updatedAt || nowISO()

@@ -824,6 +824,8 @@ const App = (() => {
       const v = readForm(form, ['id', 'description', 'amount', 'date', 'category', 'subcategory', 'account', 'method', 'installments', 'paid', 'type', 'observations'])
       v.amount = Number(v.amount)
       v.installments = v.installments === '' || v.installments === undefined ? 1 : Number(v.installments)
+      v.paid = v.paid === 'true' || v.paid === true
+      if (v.paid && v.status === undefined) v.status = 'paid'
       const res = v.id ? DB.Transactions.update(v.id, v) : DB.Transactions.add(v)
       res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Lançamento atualizado ✓' : 'Lançamento registrado ✓'), closeModal(), renderCurrent(), refreshAll())
     }

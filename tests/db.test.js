@@ -58,6 +58,16 @@ test('updateTransaction preserva paid quando não enviado', () => {
   assert.strictEqual(s.DB.Transactions.get(t.id).paid, true)
 })
 
+test('paid string "true" vinda do form é coagida para booleano (zero-trust)', () => {
+  const s = fresh()
+  const t = s.DB.Transactions.add({ description: 'Internet', amount: 99.9, type: 'expense', date: '2026-08-19', paid: 'true' })
+  assert.strictEqual(t.paid, true)
+  assert.strictEqual(t.status, 'paid')
+  const t2 = s.DB.Transactions.add({ description: 'Luz', amount: 120, type: 'expense', date: '2026-08-19', paid: 'false' })
+  assert.strictEqual(t2.paid, false)
+  assert.strictEqual(t2.status, 'pending')
+})
+
 test('transferência NÃO cria receita/despesa e movimenta contas', () => {
   const s = fresh()
   const a1 = s.DB.Accounts.add({ name: 'Conta A', type: 'current', balance: 1000 })
