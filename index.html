@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1b2637">
+  <meta name="description" content="Life Organizer — Organize seu dia. Controle seu dinheiro. Tenha o controle da sua vida.">
+  <title>Life Organizer</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="brand">
+        <div class="brand-logo">LO</div>
+        <div>
+          <div class="brand-name">Life Organizer</div>
+          <div class="brand-slogan">Controle sua vida</div>
+        </div>
+      </div>
+      <div class="search-box">
+        <input id="global-search" class="input" type="search" placeholder="🔍 Buscar (Ctrl+K)" autocomplete="off">
+      </div>
+      <nav class="side-nav">
+        <a class="nav-item" data-page="meu-dia"><span>🏠</span> Meu Dia</a>
+        <a class="nav-item" data-page="agenda"><span>📅</span> Agenda</a>
+        <a class="nav-item" data-page="tarefas"><span>✅</span> Tarefas</a>
+        <a class="nav-item" data-page="habitos"><span>🔄</span> Hábitos</a>
+        <a class="nav-item" data-page="financas"><span>💰</span> Finanças</a>
+        <a class="nav-item" data-page="notificacoes"><span>🔔</span> Notificações <span id="notif-badge" class="nav-badge"></span></a>
+        <a class="nav-item" data-page="perfil"><span>👤</span> Perfil</a>
+        <a class="nav-item" data-page="config"><span>⚙️</span> Configurações</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="avatar-sm" id="user-avatar">A</div>
+        <span id="user-name">Anthony</span>
+      </div>
+    </aside>
+
+    <main id="main">
+      <div id="page-meu-dia" class="page"></div>
+      <div id="page-agenda" class="page"></div>
+      <div id="page-tarefas" class="page"></div>
+      <div id="page-habitos" class="page"></div>
+      <div id="page-financas" class="page"></div>
+      <div id="page-notificacoes" class="page"></div>
+      <div id="page-perfil" class="page"></div>
+      <div id="page-config" class="page"></div>
+      <div id="page-busca" class="page"></div>
+    </main>
+
+    <button id="fab" title="Adicionar rápido (N)">+</button>
+
+    <nav id="bottom-nav">
+      <button class="bn-item" data-page="meu-dia"><span>🏠</span><small>Início</small></button>
+      <button class="bn-item" data-page="agenda"><span>📅</span><small>Agenda</small></button>
+      <button id="bn-add"><span>＋</span></button>
+      <button class="bn-item" data-page="financas"><span>💰</span><small>Finanças</small></button>
+      <button class="bn-item" data-page="perfil"><span>👤</span><small>Perfil</small></button>
+    </nav>
+  </div>
+
+  <div id="modal-overlay">
+    <div id="modal">
+      <div class="modal-head"><h3 id="modal-title"></h3><button id="modal-close" class="btn btn-ghost">✕</button></div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+
+  <script src="./js/storage.js"></script>
+  <script src="./js/db.js"></script>
+  <script src="./js/insights.js"></script>
+  <script src="./js/notifications.js"></script>
+  <script src="./js/export.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
