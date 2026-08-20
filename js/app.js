@@ -592,12 +592,15 @@ const App = (() => {
     const badge = $('#notif-badge')
     if (badge) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = count > 0 ? 'inline-flex' : 'none' }
   }
-  // Badges por aba: Agenda (eventos hoje), Tarefas (pendentes+atrasadas), Finanças (contas atrasadas)
+  // Badges por aba: Agenda (eventos hoje), Tarefas (pendentes+atrasadas), Finanças (contas atrasadas), Foco (tarefas de hoje + hábitos faltantes + contas vencendo hoje)
   function renderNavBadges() {
     const today = DB.todayStr()
     const st = DB.taskStats()
     const fin = DB.pendingSummary()
-    const map = { agenda: DB.eventsByDate(today).length, tarefas: (st.pending || 0) + (st.overdue || 0), financas: fin.overdueCount || 0 }
+    const focus = DB.tasksByDate(today).filter(t => ['pending', 'in_progress', 'overdue'].includes(t.status)).length +
+      DB.Habits.list().filter(h => !h.entries.includes(today)).length +
+      DB.unpaidExpenses().filter(t => t.daysOverdue >= 0).length
+    const map = { agenda: DB.eventsByDate(today).length, tarefas: (st.pending || 0) + (st.overdue || 0), financas: fin.overdueCount || 0, foco: focus }
     $$('[data-badge]').forEach(el => {
       const n = map[el.dataset.badge] || 0
       const prev = el.dataset.prev || '0'
@@ -942,18 +945,18 @@ const App = (() => {
       const daysSel = form.querySelector('[name="daysOfWeek"]')
       v.daysOfWeek = daysSel ? Array.from(daysSel.selectedOptions).map(o => Number(o.value)) : []
       const res = v.id ? DB.Events.update(v.id, v) : DB.Events.add(v)
-      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Evento atualizado ✓' : 'Evento criado ✓'), closeModal(), renderCurrent(), gcalAutoSyncEvent(res))
+      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Evento atualizado ✓' : 'Evento criado ✓'), closeModal(), renderCurrent(), refreshAll(), gcalAutoSyncEvent(res))
     }
     if (kind === 'task') {
       const v = readForm(form, ['id', 'title', 'description', 'date', 'time', 'priority', 'category', 'deadline', 'status', 'recurring'])
       const res = v.id ? DB.Tasks.update(v.id, v) : DB.Tasks.add(v)
-      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Tarefa atualizada ✓' : 'Tarefa criada ✓'), closeModal(), renderCurrent())
+      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Tarefa atualizada ✓' : 'Tarefa criada ✓'), closeModal(), renderCurrent(), refreshAll())
     }
     if (kind === 'habit') {
       const v = readForm(form, ['id', 'name', 'icon', 'color', 'frequency', 'targetPerWeek'])
       v.targetPerWeek = Number(v.targetPerWeek) || 7
       const res = v.id ? DB.Habits.update(v.id, v) : DB.Habits.add(v)
-      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Hábito atualizado ✓' : 'Hábito criado ✓'), closeModal(), renderCurrent())
+      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Hábito atualizado ✓' : 'Hábito criado ✓'), closeModal(), renderCurrent(), refreshAll())
     }
     if (kind === 'txn') {
       const v = readForm(form, ['id', 'description', 'amount', 'date', 'category', 'subcategory', 'account', 'method', 'installments', 'paid', 'type', 'observations'])
@@ -1068,15 +1071,15 @@ const App = (() => {
     const id = el.dataset.id
     if (action === 'new-event') openEventForm(null)
     else if (action === 'edit-event') openEventForm(DB.Events.get(id))
-    else if (action === 'delete-event') { const ev = DB.Events.get(id); confirmModal('Excluir este evento?').then(ok => { if (ok) { DB.Events.remove(id); toast('Evento excluído.'); renderCurrent(); if (ev && GCAL.isConfigured()) GCAL.deleteRemote(ev) } }) }
+    else if (action === 'delete-event') { const ev = DB.Events.get(id); confirmModal('Excluir este evento?').then(ok => { if (ok) { DB.Events.remove(id); toast('Evento excluído.'); renderCurrent(); refreshAll(); if (ev && GCAL.isConfigured()) GCAL.deleteRemote(ev) } }) }
     else if (action === 'new-task') openTaskForm(null)
     else if (action === 'edit-task') openTaskForm(DB.Tasks.get(id))
-    else if (action === 'delete-task') confirmModal('Excluir esta tarefa?').then(ok => { if (ok) { DB.Tasks.remove(id); toast('Tarefa excluída.'); renderCurrent() } })
-    else if (action === 'toggle-task') { const t = DB.Tasks.get(id); DB.Tasks.update(id, { status: t.status === 'done' ? 'pending' : 'done' }); renderCurrent() }
+    else if (action === 'delete-task') confirmModal('Excluir esta tarefa?').then(ok => { if (ok) { DB.Tasks.remove(id); toast('Tarefa excluída.'); renderCurrent(); refreshAll() } })
+    else if (action === 'toggle-task') { const t = DB.Tasks.get(id); DB.Tasks.update(id, { status: t.status === 'done' ? 'pending' : 'done' }); renderCurrent(); refreshAll() }
     else if (action === 'new-habit') openHabitForm(null)
     else if (action === 'edit-habit') openHabitForm(DB.Habits.get(id))
-    else if (action === 'delete-habit') confirmModal('Excluir este hábito?').then(ok => { if (ok) { DB.Habits.remove(id); toast('Hábito excluído.'); renderCurrent() } })
-    else if (action === 'toggle-habit') { DB.habitToggle(DB.Habits.get(id), el.dataset.date); renderCurrent(); toast('Hábito marcado! 🔥', 'success') }
+    else if (action === 'delete-habit') confirmModal('Excluir este hábito?').then(ok => { if (ok) { DB.Habits.remove(id); toast('Hábito excluído.'); renderCurrent(); refreshAll() } })
+    else if (action === 'toggle-habit') { DB.habitToggle(DB.Habits.get(id), el.dataset.date); renderCurrent(); refreshAll(); toast('Hábito marcado! 🔥', 'success') }
     else if (action === 'new-txn') openTxnForm(el.dataset.type || 'expense', null)
     else if (action === 'edit-txn') openTxnForm(DB.Transactions.get(id).type, DB.Transactions.get(id))
     else if (action === 'delete-txn') confirmModal('Excluir este lançamento?' + (DB.Transactions.get(id) && DB.Transactions.get(id).installment ? ' (apenas esta parcela)' : '')).then(ok => { if (ok) { DB.Transactions.remove(id); toast('Lançamento excluído.'); renderCurrent(); refreshAll() } })
