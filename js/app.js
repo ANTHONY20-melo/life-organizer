@@ -67,6 +67,7 @@ const App = (() => {
     renderCurrent()
     window.scrollTo(0, 0)
     renderNotifBadge()
+    renderNavBadges()
   }
   function renderCurrent() {
     const fn = { 'meu-dia': renderMeuDia, 'agenda': renderAgenda, 'tarefas': renderTarefas, 'habitos': renderHabitos, 'financas': renderFinancas, 'notificacoes': renderNotificacoes, 'perfil': renderPerfil, 'config': renderConfig, 'busca': renderBusca }[currentPage]
@@ -96,8 +97,24 @@ const App = (() => {
     const balance = DB.totalBalance()
     const goals = DB.Goals.list().map(DB.goalProgress).sort((a, b) => b.pct - a.pct)
     const alerts = DB.budgetAlerts()
+    const onboarding = !DB.getSettings().onboardingDone
+    const focusTasks = tasks.filter(t => ['pending', 'in_progress', 'overdue'].includes(t.status))
+    const habitsMissing = habits.filter(h => !h.entries.includes(today))
+    const dueBills = DB.unpaidExpenses().filter(t => t.daysOverdue >= 0)
 
-    let html = `<div class="hero-card">
+    let html = ''
+    if (onboarding) {
+      html += `<div class="card onboarding-card">
+        <h2>👋 Bem-vindo ao Life Organizer!</h2>
+        <p class="muted">Agenda, tarefas, hábitos e finanças em um só lugar — 100% privado, direto no seu navegador. Comece com dados de exemplo para explorar, ou do zero.</p>
+        <div class="modal-actions" style="justify-content:flex-start">
+          <button class="btn btn-primary" data-action="seed-demo">🚀 Carregar exemplos</button>
+          <button class="btn btn-ghost" data-action="dismiss-onboarding">💪 Começar do zero</button>
+        </div>
+      </div>`
+    }
+
+    html += `<div class="hero-card">
       <h1>${greeting()}<span class="accent">${esc(DB.getSettings().name || 'Anthony')}</span> 👋</h1>
       <p class="muted">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
       <div class="stat-grid">
@@ -116,6 +133,12 @@ const App = (() => {
     }
 
     html += `<div class="day-grid">
+      ${(focusTasks.length || habitsMissing.length || dueBills.length) ? `<section class="card focus-card">
+        <h2>🎯 Foco de hoje</h2>
+        ${focusTasks.length ? focusTasks.map(t => `<div class="mini-row"><button class="btn btn-sm ${t.status === 'done' ? 'btn-success' : 'btn-ghost'}" data-action="toggle-task" data-id="${esc(t.id)}">${t.status === 'done' ? '✓' : '○'}</button><span>${esc(t.title)}</span><strong class="muted small">${esc(t.time || '')}</strong></div>`).join('') : ''}
+        ${habitsMissing.length ? `<div class="spacer"></div><h3 class="muted small">🔄 Hábitos de hoje</h3>` + habitsMissing.map(h => `<div class="mini-row"><button class="btn btn-sm btn-ghost" data-action="toggle-habit" data-id="${esc(h.id)}" data-date="${today}">⬜</button><span>${esc(h.icon)} ${esc(h.name)}</span></div>`).join('') : ''}
+        ${dueBills.length ? `<div class="spacer"></div><h3 class="muted small">📤 Contas vencendo hoje</h3>` + dueBills.map(t => `<div class="mini-row"><button class="btn btn-sm btn-success" data-action="toggle-txn" data-id="${esc(t.id)}">✓ Pagar</button><span>${esc(t.description)}</span><strong>${DB.money(t.amount)}</strong></div>`).join('') : ''}
+      </section>` : ''}
       <section class="card">
         <h2>🕐 Linha do tempo de hoje</h2>
         ${renderTimeline(events, tasks)}
@@ -156,6 +179,7 @@ const App = (() => {
         <button class="btn btn-ghost" data-agenda-nav="-1">←</button>
         <button class="btn btn-ghost" data-agenda-today>Hoje</button>
         <button class="btn btn-ghost" data-agenda-nav="1">→</button>
+        <button class="btn btn-ghost" data-action="export-ics" title="Exportar agenda (.ics) — importável em Google/Outlook/Apple">⬇️ ICS</button>
         <button class="btn btn-primary" data-action="new-event">+ Novo evento</button>
       </div>
     </div>`
@@ -567,6 +591,22 @@ const App = (() => {
     const count = DB.Notifications.unreadCount()
     const badge = $('#notif-badge')
     if (badge) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = count > 0 ? 'inline-flex' : 'none' }
+  }
+  // Badges por aba: Agenda (eventos hoje), Tarefas (pendentes+atrasadas), Finanças (contas atrasadas)
+  function renderNavBadges() {
+    const today = DB.todayStr()
+    const st = DB.taskStats()
+    const fin = DB.pendingSummary()
+    const map = { agenda: DB.eventsByDate(today).length, tarefas: (st.pending || 0) + (st.overdue || 0), financas: fin.overdueCount || 0 }
+    $$('[data-badge]').forEach(el => {
+      const n = map[el.dataset.badge] || 0
+      const prev = el.dataset.prev || '0'
+      el.textContent = n > 99 ? '99+' : n
+      el.style.display = n > 0 ? 'inline-flex' : 'none'
+      if (el.classList.contains('bn-badge')) el.classList.toggle('visible', n > 0)
+      if (n > Number(prev)) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse') }
+      el.dataset.prev = n
+    })
   }
 
   // ---------- PÁGINA: PERFIL ----------
@@ -983,8 +1023,18 @@ const App = (() => {
     refreshReminders()
   }
 
-  // ---------- quick actions (FAB) ----------
-  function showQuickActions() {
+  // ---------- quick actions (FAB/＋) ----------
+  // Clique = ação contextual da aba atual (form principal); long-press = menu completo
+  const CONTEXTUAL_ADD = { 'meu-dia': 'new-event', agenda: 'new-event', tarefas: 'new-task', habitos: 'new-habit', financas: 'new-txn' }
+  function showQuickActions(forceMenu) {
+    if (!forceMenu) {
+      const direct = CONTEXTUAL_ADD[currentPage]
+      if (direct) {
+        if (direct === 'new-txn') { openTxnForm('expense', null); return }
+        handleAction(direct, { dataset: {} })
+        return
+      }
+    }
     openModal(`<h3>➕ Adicionar rápido</h3>
       <div class="quick-grid">
         <button class="quick-btn" data-action="new-event">📅<span>Evento</span></button>
@@ -995,7 +1045,22 @@ const App = (() => {
         <button class="quick-btn" data-action="new-goal">🎯<span>Meta</span></button>
         <button class="quick-btn" data-action="new-recurring">🔁<span>Recorrência</span></button>
         <button class="quick-btn" data-action="new-transfer">🔄<span>Transferência</span></button>
-      </div>`, { title: 'Adicionar rápido' })
+      </div>
+      <p class="muted small" style="margin-top:10px">💡 Toque e segure no botão ＋ para abrir este menu em qualquer aba.</p>`, { title: 'Adicionar rápido' })
+  }
+  function bindQuickAdd() {
+    let timer = null, longFired = false
+    const start = e => { longFired = false; timer = setTimeout(() => { longFired = true; showQuickActions(true) }, 550) }
+    const cancel = () => clearTimeout(timer)
+    const click = () => { if (longFired) { longFired = false; return } showQuickActions() }
+    ;['#bn-add', '#fab'].forEach(sel => {
+      const el = $(sel)
+      if (!el) return
+      el.addEventListener('pointerdown', start)
+      el.addEventListener('pointerup', cancel)
+      el.addEventListener('pointerleave', cancel)
+      el.addEventListener('click', click)
+    })
   }
 
   // ---------- global click delegation ----------
@@ -1049,11 +1114,14 @@ const App = (() => {
     else if (action === 'mark-all-read') { DB.Notifications.markAllRead(); toast('Todas as notificações marcadas como lidas ✓'); renderNotificacoes(); renderNotifBadge() }
     else if (action === 'export-json') { Export.exportJSON(); toast('Backup JSON exportado ✓') }
     else if (action === 'export-csv') { const r = Export.exportTransactionsCSV(finMonth); toast(`CSV exportado com ${r.count} lançamentos ✓`) }
+    else if (action === 'export-ics') { const r = Export.exportEventsICS(); toast(`Agenda exportada (.ics) com ${r.count} eventos futuros ✓`) }
     else if (action === 'import-json') { $('#import-file').click() }
     else if (action === 'clear-data') confirmModal('Apagar TODOS os dados? Esta ação não pode ser desfeita. Faça um backup antes.', '⚠️ Atenção').then(ok => { if (ok) { DB.clearAllData(); DB.init(); toast('Dados apagados.', 'danger'); renderCurrent(); renderNotifBadge() } })
     else if (action === 'toggle-txn-group') { const t = DB.Transactions.get(id); if (t && t.installment) { const group = DB.Transactions.getInstallmentGroup(t.installment.groupId); const allPaid = group.every(x => x.paid); group.forEach(x => DB.update('transactions', x.id, { paid: !allPaid })); renderCurrent(); refreshAll() } }
     else if (action === 'add-account') openAccountForm(null)
     else if (action === 'add-card') openCardForm(null)
+    else if (action === 'seed-demo') { DB.saveSettings({ onboardingDone: true }); seedDemoData() }
+    else if (action === 'dismiss-onboarding') { DB.saveSettings({ onboardingDone: true }); toast('Bora organizar! 🚀'); renderCurrent() }
   }
   function bindGlobalClicks() {
     document.addEventListener('click', e => {
@@ -1148,7 +1216,7 @@ const App = (() => {
     reader.readAsText(file)
   }
   function seedDemoData() {
-    if (DB.Transactions.list().length || DB.Events.list().length) { toast('Dados já existem.'); return }
+    if (DB.Transactions.list().length || DB.Events.list().length) { toast('Dados já existem — mantidos.'); renderCurrent(); return }
     const t = DB.todayStr()
     const m = t.slice(0, 7)
     // eventos
@@ -1240,6 +1308,7 @@ const App = (() => {
   function refreshAll() {
     refreshReminders()
     renderNotifBadge()
+    renderNavBadges()
   }
 
   // ---------- init ----------
@@ -1249,16 +1318,23 @@ const App = (() => {
     bindModalEvents()
     bindGlobalClicks()
     setupSW()
-    // botões "+" (FAB flutuante + central da barra inferior) abrem o menu de adição rápida
-    const bnAdd = $('#bn-add')
-    if (bnAdd) bnAdd.addEventListener('click', showQuickActions)
-    const fab = $('#fab')
-    if (fab) fab.addEventListener('click', showQuickActions)
+    bindQuickAdd()
+    // hide-on-scroll (mobile): esconde nav ao rolar para baixo, mostra ao rolar para cima
+    const mainEl = $('#main')
+    if (mainEl) {
+      let lastScrollTop = 0
+      mainEl.addEventListener('scroll', () => {
+        const y = mainEl.scrollTop
+        if (y > 80 && y > lastScrollTop + 4) document.body.classList.add('nav-hidden')
+        else if (y < lastScrollTop - 4 || y <= 80) document.body.classList.remove('nav-hidden')
+        lastScrollTop = y
+      }, { passive: true })
+    }
     const name = DB.getSettings().name
     $('#user-name').textContent = name || 'Anthony'
     document.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); const s = $('#global-search'); if (s) { s.focus(); s.select() } }
-      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !$('#modal').classList.contains('open')) showQuickActions()
+      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !$('#modal').classList.contains('open')) showQuickActions(true)
     })
     navigate('meu-dia')
     refreshAll()

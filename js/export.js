@@ -66,7 +66,56 @@ const Export = (() => {
     return { count: DB.Events.list().length }
   }
 
-  return { toCSV, transactionsToCSV, eventsToCSV, download, exportJSON, exportTransactionsCSV, exportEventsCSV }
+  // ---------- ICS (Google/Outlook/Apple Calendar) ----------
+  function escapeICS(s) {
+    return String(s === null || s === undefined ? '' : s).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/;/g, '\\;').replace(/,/g, '\\,')
+  }
+
+  // data local YYYY-MM-DD [+ HH:MM] → ISO 8601 local (sem Z) para DTSTART/DTEND
+  function icsDateTime(date, time) {
+    const d = String(date).replace(/[-:]/g, '')
+    if (time && /^\d{2}:\d{2}$/.test(time)) return d + 'T' + time.replace(':', '') + '00'
+    return d
+  }
+
+  // DTEND: evento com hora → 1h depois; sem hora → dia seguinte (inclusivo all-day no ICS)
+  function icsEndDate(date, time) {
+    const base = new Date(date + (time ? 'T' + time : 'T12:00:00'))
+    base.setDate(base.getDate() + 1)
+    const pad = n => String(n).padStart(2, '0')
+    const d = base.getFullYear() + pad(base.getMonth() + 1) + pad(base.getDate())
+    return time && /^\d{2}:\d{2}$/.test(time) ? d + 'T' + time.replace(':', '') + '00' : d
+  }
+
+  function eventsToICS(events) {
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Life Organizer//JARVIS//PT-BR', 'CALSCALE:GREGORIAN']
+    ;(events || []).forEach(e => {
+      const dtstart = icsDateTime(e.date, e.startTime)
+      const dtend = icsEndDate(e.date, e.startTime)
+      lines.push('BEGIN:VEVENT')
+      lines.push('UID:' + (e.id || 'evt-' + Math.random().toString(36).slice(2)) + '@life-organizer')
+      lines.push('DTSTAMP:' + icsDateTime(DB.todayStr(), '') + 'T000000')
+      lines.push('DTSTART' + (/T\d{6}$/.test(dtstart) ? '' : ';VALUE=DATE') + ':' + dtstart)
+      lines.push('DTEND' + (/T\d{6}$/.test(dtend) ? '' : ';VALUE=DATE') + ':' + dtend)
+      lines.push('SUMMARY:' + escapeICS(e.title || ''))
+      if (e.description) lines.push('DESCRIPTION:' + escapeICS(e.description))
+      if (e.location) lines.push('LOCATION:' + escapeICS(e.location))
+      if (e.category) lines.push('CATEGORIES:' + escapeICS(e.category))
+      if (e.priority === 'alta') lines.push('PRIORITY:1')
+      else if (e.priority === 'baixa') lines.push('PRIORITY:9')
+      lines.push('END:VEVENT')
+    })
+    lines.push('END:VCALENDAR')
+    return lines.join('\r\n')
+  }
+
+  function exportEventsICS() {
+    const events = DB.Events.list().filter(e => e.date >= DB.todayStr())
+    download('life-organizer-agenda.ics', eventsToICS(events), 'text/calendar;charset=utf-8')
+    return { count: events.length }
+  }
+
+  return { toCSV, transactionsToCSV, eventsToCSV, escapeICS, icsDateTime, icsEndDate, eventsToICS, download, exportJSON, exportTransactionsCSV, exportEventsCSV, exportEventsICS }
 })()
 
 if (typeof module !== 'undefined' && module.exports) module.exports = { Export }
