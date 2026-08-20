@@ -360,35 +360,53 @@ label { font-size: 12px; font-weight: 700; color: var(--muted); display: block; 
 @media (max-width: 900px) {
   #sidebar { display: none; }
   #main { padding: 16px 14px 96px; }
+  #fab { display: none; }
   .day-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
   .quick-grid { grid-template-columns: repeat(4, 1fr); }
-  #fab { right: 16px; bottom: 76px; width: 50px; height: 50px; }
   #bottom-nav {
     display: flex; position: fixed; bottom: 0; left: 0; right: 0;
     background: var(--bg2); border-top: 1px solid var(--border);
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
     justify-content: space-around; align-items: center; z-index: 60;
   }
   .bn-item {
     background: none; border: none; color: var(--muted); cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
-    font-size: 18px; padding: 6px 10px; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    font-size: 16px; padding: 4px 6px; border-radius: 10px;
+    flex: 1; min-width: 0;
   }
-  .bn-item small { font-size: 10px; font-weight: 700; }
+  .bn-item small { font-size: 9px; font-weight: 700; }
   .bn-item.active-link { color: var(--accent); }
   #bn-add {
-    width: 52px; height: 52px; border-radius: 50%; border: none;
+    width: 44px; height: 44px; border-radius: 50%; border: none;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff; font-size: 26px; font-weight: 800; cursor: pointer;
-    box-shadow: 0 6px 18px rgba(59, 130, 246, .45); margin-top: -18px;
+    color: #fff; font-size: 22px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, .45); margin-top: -14px;
+    flex: 0 0 auto;
   }
-  #toast-container { bottom: 90px; right: 12px; left: 12px; align-items: flex-end; }
+  .hero-card { padding: 16px; }
+  .hero-card h1 { font-size: 22px; }
+  .card { padding: 14px; }
+  .page-head h1 { font-size: 20px; }
+  .stat { padding: 10px; }
+  .stat strong { font-size: 16px; }
+  .cal-cell { min-height: 54px; padding: 3px; font-size: 10px; }
+  #toast-container { bottom: 80px; right: 10px; left: 10px; align-items: flex-end; }
 }
 @media (max-width: 480px) {
-  .page-head h1 { font-size: 20px; }
+  #main { padding: 12px 10px 88px; }
+  .page-head h1 { font-size: 18px; }
   .quick-grid { grid-template-columns: repeat(2, 1fr); }
-  .hero-card h1 { font-size: 22px; }
+  .quick-btn { padding: 10px 6px; font-size: 18px; }
+  .hero-card h1 { font-size: 20px; }
+  .card h2 { font-size: 14px; }
+  .input, select.input, textarea.input { font-size: 16px; padding: 8px 10px; margin: 2px 0 10px; }
+  .cal-cell { min-height: 44px; }
+  .cal-num { font-size: 11px; }
+  .cal-ev { font-size: 9px; padding: 1px 3px; }
+  .fin-tab { padding: 6px 10px; font-size: 12px; }
+  .btn { padding: 7px 10px; font-size: 12px; }
 }
 
 /* ---------- lock screen ---------- */

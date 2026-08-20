@@ -1295,6 +1295,11 @@ const App = (() => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); const s = $('#global-search'); if (s) { s.focus(); s.select() } }
       if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !$('#modal').classList.contains('open')) showQuickActions()
     })
+    // Bind FAB (desktop) and bn-add (mobile) to open quick actions
+    const fab = document.getElementById('fab')
+    const bnAdd = document.getElementById('bn-add')
+    if (fab) fab.addEventListener('click', () => showQuickActions())
+    if (bnAdd) bnAdd.addEventListener('click', () => showQuickActions())
     navigate('meu-dia')
     refreshAll()
   }
