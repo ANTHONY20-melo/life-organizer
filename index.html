@@ -73,7 +73,25 @@
   <div id="toast-container"></div>
   <input type="file" id="import-file" accept=".json,application/json" style="display:none">
 
+  <!-- Tela de Lock (PIN) -->
+  <div id="lock-screen">
+    <div class="lock-card">
+      <div class="lock-logo">LO</div>
+      <h2>Life Organizer</h2>
+      <p class="muted" id="lock-subtitle">Digite seu PIN para desbloquear</p>
+      <div class="pin-input-group" id="pin-group">
+        <input type="password" class="input pin-input" id="pin-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="••••••" autofocus>
+      </div>
+      <div id="pin-error" class="alert alert-danger" style="display:none"></div>
+      <div class="modal-actions" style="justify-content:center;flex-direction:column;align-items:center;gap:10px">
+        <button class="btn btn-primary" id="pin-submit" style="width:100%;max-width:260px">Desbloquear</button>
+        <button class="btn btn-ghost" id="pin-setup-toggle" style="display:none;font-size:12px">Criar PIN novo</button>
+      </div>
+    </div>
+  </div>
+
   <script src="./js/storage.js"></script>
+  <script src="./js/crypto.js"></script>
   <script src="./js/db.js"></script>
   <script src="./js/insights.js"></script>
   <script src="./js/notifications.js"></script>

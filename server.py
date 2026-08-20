@@ -14,6 +14,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         '.json': 'application/json',
         '.webmanifest': 'application/manifest+json',
     }
+    def end_headers(self):
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
+        self.send_header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        super().end_headers()
+
     def log_message(self, fmt, *args):
         pass
 

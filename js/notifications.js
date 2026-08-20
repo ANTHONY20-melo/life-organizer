@@ -1,7 +1,7 @@
-/* LIFE ORGANIZER — Notifications (planejamento puro + ponte com o Service Worker). */
+/* LIFE ORGANIZER — NotificationPlanner (planejamento puro + ponte com o Service Worker). */
 'use strict'
 
-const Notifications = (() => {
+const NotificationPlanner = (() => {
   // ---------- planejamento puro (testável em Node) ----------
   // Gera lembretes de compromissos: evento com notifyBefore minutos antes; horário no dia.
   // Planejamento PURO — não filtra por Date.now() (timestamp passado é tratado pelo SW com fallback now+5s).
@@ -87,4 +87,4 @@ const Notifications = (() => {
   return { planEventReminders, planBillReminders, morningSummary, planAll }
 })()
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { Notifications }
+if (typeof module !== 'undefined' && module.exports) module.exports = { NotificationPlanner }

@@ -390,3 +390,34 @@ label { font-size: 12px; font-weight: 700; color: var(--muted); display: block; 
   .quick-grid { grid-template-columns: repeat(2, 1fr); }
   .hero-card h1 { font-size: 22px; }
 }
+
+/* ---------- lock screen ---------- */
+#lock-screen {
+  position: fixed; inset: 0; z-index: 999;
+  background: var(--bg);
+  display: none; align-items: center; justify-content: center;
+}
+#lock-screen.active { display: flex; }
+.lock-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 36px 32px;
+  max-width: 360px; width: 90%; text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+}
+.lock-logo {
+  width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 14px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; font-weight: 800; font-size: 24px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow);
+}
+.lock-card h2 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.pin-input-group { margin: 18px 0 10px; }
+.pin-input {
+  width: 100%; max-width: 200px; margin: 0 auto;
+  text-align: center; font-size: 28px; letter-spacing: 10px;
+  padding: 12px 16px; background: var(--bg2); border: 2px solid var(--border);
+  border-radius: 12px; color: var(--text); font-weight: 700;
+}
+.pin-input:focus { outline: none; border-color: var(--accent); }
+#pin-error { font-size: 13px; margin-bottom: 10px; }

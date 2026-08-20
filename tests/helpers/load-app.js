@@ -38,14 +38,14 @@ function loadApp(extraGlobals = {}) {
     ...extraGlobals
   }
   vm.createContext(sandbox)
-  const files = ['storage.js', 'db.js', 'insights.js', 'notifications.js', 'export.js']
+  const files = ['storage.js', 'crypto.js', 'db.js', 'insights.js', 'notifications.js', 'export.js']
   files.forEach(f => {
     const code = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8')
     vm.runInContext(code, sandbox, { filename: f })
   })
   // const/let top-level ficam no escopo lexical do contexto (não viram propriedade do sandbox);
   // promove as exports para acesso de fora (padrão da casa).
-  ;['Storage', 'DB', 'Insights', 'Notifications', 'Export'].forEach(n => {
+  ;['Storage', 'DB', 'Insights', 'NotificationPlanner', 'Export'].forEach(n => {
     sandbox[n] = vm.runInContext(`typeof ${n} !== 'undefined' ? ${n} : undefined`, sandbox)
   })
   return sandbox

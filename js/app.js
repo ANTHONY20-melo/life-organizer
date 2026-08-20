@@ -599,6 +599,7 @@ const App = (() => {
   // ---------- PÁGINA: CONFIG ----------
   function renderConfig() {
     const s = DB.getSettings()
+    const hasPin = Crypto.isPinSet()
     let html = `<div class="page-head"><h1>⚙️ Configurações</h1></div>
     <div class="day-grid">
       <section class="card"><h2>👤 Perfil</h2>
@@ -607,6 +608,19 @@ const App = (() => {
       </section>
       <section class="card"><h2>🎨 Aparência</h2>
         <div class="segmented">${['dark', 'light', 'system'].map(t => `<button class="seg-btn ${s.theme === t ? 'active' : ''}" data-theme="${t}">${t === 'dark' ? '🌙 Escuro' : t === 'light' ? '☀️ Claro' : '🖥️ Sistema'}</button>`).join('')}</div>
+      </section>
+      <section class="card"><h2>🔒 Segurança</h2>
+        <p class="muted small" style="margin-bottom:10px">${hasPin ? 'PIN ativo — seus dados estão criptografados.' : 'Configure um PIN para proteger seus dados financeiros.'}</p>
+        ${hasPin
+          ? `<div class="modal-actions" style="justify-content:flex-start;flex-direction:column;gap:8px">
+              <div class="form-row"><label>Senha atual</label><input class="input" type="password" id="cfg-pin-old" placeholder="••••••"></div>
+              <div class="form-row"><label>Nova senha</label><input class="input" type="password" id="cfg-pin-new" placeholder="••••••"></div>
+              <button class="btn btn-primary" id="cfg-pin-change">Alterar PIN</button>
+              <button class="btn btn-danger" id="cfg-pin-remove">Remover PIN</button>
+            </div>`
+          : `<div class="form-row"><label>Criar PIN (4-6 dígitos)</label><input class="input" type="password" id="cfg-pin-new" placeholder="••••••" maxlength="6" inputmode="numeric"></div>
+            <button class="btn btn-primary" id="cfg-pin-create" style="margin-top:8px">Criar PIN</button>`
+        }
       </section>
       <section class="card"><h2>🔔 Notificações</h2>
         <div class="mini-row"><span>Notificações habilitadas</span><label class="switch"><input type="checkbox" id="cfg-notif-enabled" ${s.notificationPrefs.enabled ? 'checked' : ''}><span class="slider"></span></label></div>
@@ -625,6 +639,42 @@ const App = (() => {
       </section>
     </div>`
     $('#page-config').innerHTML = html
+
+    // Bind PIN events
+    const pinCreate = document.getElementById('cfg-pin-create')
+    const pinChange = document.getElementById('cfg-pin-change')
+    const pinRemove = document.getElementById('cfg-pin-remove')
+
+    if (pinCreate) {
+      pinCreate.addEventListener('click', async () => {
+        const pin = (document.getElementById('cfg-pin-new').value || '').trim()
+        if (!pin || pin.length < 4) { toast('PIN deve ter pelo menos 4 dígitos.', 'danger'); return }
+        await Crypto.setupPin(pin)
+        await Storage.migrateToEncryption()
+        toast('PIN criado! Dados criptografados. 🔒', 'success')
+        renderConfig()
+      })
+    }
+    if (pinChange) {
+      pinChange.addEventListener('click', async () => {
+        const oldPin = (document.getElementById('cfg-pin-old').value || '').trim()
+        const newPin = (document.getElementById('cfg-pin-new').value || '').trim()
+        if (!oldPin || !newPin) { toast('Preencha ambos os campos.', 'danger'); return }
+        if (newPin.length < 4) { toast('Novo PIN deve ter pelo menos 4 dígitos.', 'danger'); return }
+        const ok = await Crypto.changePin(oldPin, newPin)
+        if (ok) { toast('PIN alterado! 🔒', 'success'); renderConfig() }
+        else toast('PIN atual incorreto.', 'danger')
+      })
+    }
+    if (pinRemove) {
+      pinRemove.addEventListener('click', async () => {
+        const pin = (document.getElementById('cfg-pin-old').value || '').trim()
+        if (!pin) { toast('Digite o PIN atual para remover.', 'danger'); return }
+        const ok = await Crypto.removePin(pin)
+        if (ok) { toast('PIN removido. Dados não criptografados.', 'warning'); renderConfig() }
+        else toast('PIN incorreto.', 'danger')
+      })
+    }
   }
 
   // ---------- BUSCA ----------
@@ -646,7 +696,7 @@ const App = (() => {
 
   // ---------- FORMULÁRIOS (modais) ----------
   function formShell(title, body, dataForm) {
-    return `<h3>${title}</h3><form data-form="${dataForm}">${body}<div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Cancelar</button><button type="submit" class="btn btn-primary">Salvar</button></div></form>`
+    return `<h3>${esc(title)}</h3><form data-form="${dataForm}">${body}<div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Cancelar</button><button type="submit" class="btn btn-primary">Salvar</button></div></form>`
   }
   function optionsFrom(choices, selected, labels) {
     return choices.map(c => `<option value="${esc(c)}" ${c === selected ? 'selected' : ''}>${esc(labels ? labels[c] : c)}</option>`).join('')
@@ -741,7 +791,7 @@ const App = (() => {
   }
   function openCardPurchaseForm(cardId) {
     const card = DB.Cards.get(cardId)
-    openModal(formShell('💳 Nova compra' + (card ? ' — ' + card.name : ''), `
+    openModal(formShell('💳 Nova compra' + (card ? ' — ' + esc(card.name) : ''), `
       <label>Descrição *</label><input class="input" name="description" required value="" maxlength="200">
       <div class="form-row"><div><label>Valor total *</label><input class="input" type="number" name="amount" required step="0.01" min="0.01"></div><div><label>Categoria</label><select class="input" name="category">${categoryOptions('expense', '')}</select></div></div>
       <div class="form-row"><div><label>Parcelas</label><select class="input" name="installments"><option value="1">À vista</option>${Array.from({ length: 47 }, (_, i) => `<option value="${i + 2}">${i + 2}x</option>`).join('')}</select></div><div><label>Data</label><input class="input" type="date" name="date" value="${esc(DB.todayStr())}"></div></div>
@@ -795,13 +845,48 @@ const App = (() => {
   function readForm(form, names) {
     const out = {}
     names.forEach(n => {
-      const el = form.querySelector('[name="' + n + '"]')
+      const el = form.elements ? form.elements[n] : form.querySelector('[name="' + n + '"]')
       if (!el) return
       out[n] = el.type === 'checkbox' ? el.checked : el.value
     })
     return out
   }
+
+  // Validação JS de formulários (fallback para required/pattern do HTML)
+  function validateForm(form) {
+    const requiredFields = form.querySelectorAll('[required]')
+    let valid = true
+    requiredFields.forEach(field => {
+      // Remove erro anterior
+      field.style.borderColor = ''
+      const val = field.type === 'checkbox' ? field.checked : field.value.trim()
+      if (!val) {
+        field.style.borderColor = 'var(--danger)'
+        valid = false
+      }
+    })
+    // Valida type="number" com min/max
+    const numberFields = form.querySelectorAll('input[type="number"]')
+    numberFields.forEach(field => {
+      const val = Number(field.value)
+      if (field.value && !Number.isFinite(val)) {
+        field.style.borderColor = 'var(--danger)'
+        valid = false
+      }
+      if (field.min && val < Number(field.min)) {
+        field.style.borderColor = 'var(--danger)'
+        valid = false
+      }
+      if (field.max && val > Number(field.max)) {
+        field.style.borderColor = 'var(--danger)'
+        valid = false
+      }
+    })
+    if (!valid) toast('Preencha os campos obrigatórios.', 'danger')
+    return valid
+  }
   function handleForm(kind, form) {
+    if (!validateForm(form)) return
     if (kind === 'event') {
       const v = readForm(form, ['id', 'title', 'description', 'date', 'startTime', 'endTime', 'location', 'category', 'priority', 'notifyBefore', 'recurrence', 'observations'])
       const daysSel = form.querySelector('[name="daysOfWeek"]')
@@ -939,7 +1024,7 @@ const App = (() => {
     else if (action === 'delete-goal') confirmModal('Excluir esta meta?').then(ok => { if (ok) { DB.Goals.remove(id); toast('Meta excluída.'); renderCurrent() } })
     else if (action === 'contribute-goal') {
       const g = DB.Goals.get(id)
-      openModal(formShell('💰 Aporte na meta: ' + g.name, `<label>Valor do aporte *</label><input class="input" type="number" name="amount" required step="0.01" min="0.01" placeholder="0,00">`, 'goalContribute') + `<input type="hidden" id="goal-id" value="${esc(id)}">`, { title: 'Aporte' })
+      openModal(formShell('💰 Aporte na meta: ' + esc(g.name), `<label>Valor do aporte *</label><input class="input" type="number" name="amount" required step="0.01" min="0.01" placeholder="0,00">`, 'goalContribute') + `<input type="hidden" id="goal-id" value="${esc(id)}">`, { title: 'Aporte' })
     }
     else if (action === 'new-debt') openDebtForm(null)
     else if (action === 'edit-debt') openDebtForm(DB.Debts.get(id))
@@ -1010,7 +1095,7 @@ const App = (() => {
     const events = DB.Events.list()
     const tasks = DB.Tasks.list()
     const unpaid = DB.unpaidExpenses()
-    const reminders = Notifications.planAll(events, tasks, unpaid, s)
+    const reminders = NotificationPlanner.planAll(events, tasks, unpaid, s)
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'PLAN_REMINDERS', reminders })
     }
@@ -1080,7 +1165,7 @@ const App = (() => {
     DB.Habits.add({ name: 'Exercitar', icon: '🏋️', color: '#ef4444', frequency: 'daily', entries: [DB.addDays(t, -1), DB.addDays(t, -3), DB.addDays(t, -5)] })
     DB.Habits.add({ name: 'Meditar', icon: '🧘', color: '#10b981', frequency: 'daily', entries: [t] })
     // finanças
-    const pMonth = m === '2026-08' ? '2026-07' : m
+    const pMonth = DB.addDays(m + '-01', -1).slice(0, 7)
     const salaryDay = '05'
     const p1 = m + '-' + salaryDay
     DB.Transactions.add({ description: 'Salário', amount: 4500, type: 'income', category: 'Salário', date: p1, paid: true })
@@ -1151,6 +1236,59 @@ const App = (() => {
     bindModalEvents()
     bindGlobalClicks()
     setupSW()
+    setupLockScreen()
+  }
+
+  // ---------- lock screen ----------
+  function setupLockScreen() {
+    const lockScreen = document.getElementById('lock-screen')
+    const pinInput = document.getElementById('pin-input')
+    const pinSubmit = document.getElementById('pin-submit')
+    const pinError = document.getElementById('pin-error')
+    const pinSubtitle = document.getElementById('lock-subtitle')
+    const pinSetupToggle = document.getElementById('pin-setup-toggle')
+
+    if (!Crypto.isPinSet()) {
+      // Sem PIN configurado — vai direto pro app
+      startApp()
+      return
+    }
+
+    // Mostra tela de lock
+    lockScreen.classList.add('active')
+    pinSubtitle.textContent = 'Digite seu PIN para desbloquear'
+    pinSetupToggle.style.display = 'none'
+
+    async function handlePin() {
+      const pin = pinInput.value.trim()
+      if (!pin) { pinError.textContent = 'Digite o PIN.'; pinError.style.display = 'block'; return }
+      pinError.style.display = 'none'
+      pinSubmit.disabled = true
+      pinSubmit.textContent = 'Verificando...'
+      try {
+        const ok = await Storage.unlock(pin)
+        if (ok) {
+          lockScreen.classList.remove('active')
+          startApp()
+        } else {
+          pinError.textContent = 'PIN incorreto. Tente novamente.'
+          pinError.style.display = 'block'
+          pinInput.value = ''
+          pinInput.focus()
+        }
+      } catch (e) {
+        pinError.textContent = 'Erro ao verificar PIN.'
+        pinError.style.display = 'block'
+      }
+      pinSubmit.disabled = false
+      pinSubmit.textContent = 'Desbloquear'
+    }
+
+    pinSubmit.addEventListener('click', handlePin)
+    pinInput.addEventListener('keydown', e => { if (e.key === 'Enter') handlePin() })
+  }
+
+  function startApp() {
     const name = DB.getSettings().name
     $('#user-name').textContent = name || 'Anthony'
     document.addEventListener('keydown', e => {

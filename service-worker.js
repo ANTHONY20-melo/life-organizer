@@ -1,7 +1,9 @@
 /* LIFE ORGANIZER — Service Worker (cache + notificações agendadas locais) */
 'use strict'
 
-const CACHE = 'lifeorganizer-v1'
+const CACHE_PREFIX = 'lifeorganizer'
+const CACHE_VERSION = 2
+const CACHE = CACHE_PREFIX + '-v' + CACHE_VERSION
 const ASSETS = [
   './', './index.html', './manifest.json',
   './css/style.css',
@@ -14,19 +16,36 @@ self.addEventListener('install', e => {
 })
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()))
+  e.waitUntil(caches.keys().then(keys => Promise.all(
+    keys.filter(k => k.startsWith(CACHE_PREFIX) && k !== CACHE).map(k => caches.delete(k))
+  )).then(() => self.clients.claim()))
 })
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
   const url = new URL(e.request.url)
   if (url.origin !== location.origin) return
+  // stale-while-revalidate para navegação
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return r }).catch(() => caches.match('./index.html')))
+    e.respondWith(
+      caches.open(CACHE).then(c => c.match('./index.html')).then(cached => {
+        const fetchPromise = fetch(e.request).then(r => {
+          const copy = r.clone()
+          caches.open(CACHE).then(c => c.put('./index.html', copy))
+          return r
+        }).catch(() => cached)
+        return cached || fetchPromise
+      })
+    )
     return
   }
+  // cache-first com revalidate para assets
   e.respondWith(caches.match(e.request).then(cached => {
-    const fetched = fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r }).catch(() => cached)
+    const fetched = fetch(e.request).then(r => {
+      const copy = r.clone()
+      caches.open(CACHE).then(c => c.put(e.request, copy))
+      return r
+    }).catch(() => cached)
     return cached || fetched
   }))
 })
@@ -69,6 +88,10 @@ async function scheduleReminders(reminders) {
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'PLAN_REMINDERS') {
     e.waitUntil(scheduleReminders(e.data.reminders || []))
+  }
+  // Suporte a atualização forçada do SW
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
   }
 })
 

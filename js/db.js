@@ -47,22 +47,34 @@ const DB = (() => {
   // ---------- coleções ----------
   const COLLECTIONS = ['settings', 'events', 'tasks', 'habits', 'notifications', 'categories', 'accounts', 'transactions', 'recurring', 'cards', 'cardPurchases', 'budgets', 'goals', 'debts', 'assets', 'transfers']
 
+  // ---------- aggregation cache ----------
+  const _aggCache = new Map()
+  function _invalidateAgg() { _aggCache.clear() }
+  function _cachedAgg(key, fn) {
+    if (_aggCache.has(key)) return _aggCache.get(key)
+    const result = fn()
+    _aggCache.set(key, result)
+    return result
+  }
+
   function list(name) { return Storage.get(name, []) }
   function save(name, arr) { return Storage.set(name, arr) }
   function getById(name, id) { return list(name).find(x => x.id === id) || null }
-  function insert(name, item) { const arr = list(name); arr.push(item); save(name, arr); return item }
+  function insert(name, item) { const arr = list(name); arr.push(item); save(name, arr); _invalidateAgg(); return item }
   function update(name, id, patch) {
     const arr = list(name)
     const i = arr.findIndex(x => x.id === id)
     if (i < 0) return null
     arr[i] = Object.assign({}, arr[i], patch, { updatedAt: nowISO() })
     save(name, arr)
+    _invalidateAgg()
     return arr[i]
   }
   function remove(name, id) {
     const arr = list(name)
     const next = arr.filter(x => x.id !== id)
     save(name, next)
+    _invalidateAgg()
     return next.length !== arr.length
   }
 
@@ -110,6 +122,9 @@ const DB = (() => {
 
   function sanitizeHabit(h) {
     if (!h || typeof h.name !== 'string' || !h.name.trim()) return null
+    const MAX_ENTRIES = 365
+    const rawEntries = Array.isArray(h.entries) ? h.entries.filter(x => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)).sort() : []
+    const entries = rawEntries.length > MAX_ENTRIES ? rawEntries.slice(rawEntries.length - MAX_ENTRIES) : rawEntries
     return {
       id: typeof h.id === 'string' ? h.id : uid('hab'),
       name: h.name.trim().slice(0, 80),
@@ -117,7 +132,7 @@ const DB = (() => {
       color: (typeof h.color === 'string' ? h.color : '#2563eb').slice(0, 9),
       frequency: h.frequency === 'weekly' ? 'weekly' : 'daily',
       targetPerWeek: Number.isInteger(num(h.targetPerWeek)) ? Math.max(1, Math.min(7, Math.round(num(h.targetPerWeek)))) : 7,
-      entries: Array.isArray(h.entries) ? h.entries.filter(x => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)).sort() : [],
+      entries,
       createdAt: h.createdAt || nowISO(),
       updatedAt: h.updatedAt || nowISO()
     }
@@ -367,7 +382,7 @@ const DB = (() => {
     list: () => list('cards'), get: id => getById('cards', id),
     add: c => { const s = sanitizeCard(c); return s ? insert('cards', s) : { success: false, error: 'Cartão inválido: nome obrigatório.' } },
     update: (id, patch) => { const s = sanitizeCard(Object.assign({}, getById('cards', id), patch)); return s ? update('cards', id, s) : null },
-    remove: id => { remove('cardPurchases', undefined); return remove('cards', id) }
+    remove: id => { const purchases = list('cardPurchases').filter(p => p.cardId !== id); save('cardPurchases', purchases); return remove('cards', id) }
   }
   const CardPurchases = {
     list: () => list('cardPurchases'),
@@ -648,38 +663,47 @@ const DB = (() => {
   // ---------- finanças: agregações ----------
   function transactionsByMonth(month) {
     const m = month || monthStr()
-    return Transactions.list().filter(t => t.date.slice(0, 7) === m)
+    return _cachedAgg('txMonth_' + m, () => Transactions.list().filter(t => t.date.slice(0, 7) === m))
   }
   function transactionsByRange(fromStr, toStr) {
-    return Transactions.list().filter(t => t.date >= fromStr && t.date <= toStr)
+    return _cachedAgg('txRange_' + fromStr + '_' + toStr, () => Transactions.list().filter(t => t.date >= fromStr && t.date <= toStr))
   }
   function monthlySummary(month) {
-    const txs = transactionsByMonth(month)
-    const incomes = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    return { month: month || monthStr(), incomes, expenses, balance: incomes - expenses, count: txs.length }
+    const m = month || monthStr()
+    return _cachedAgg('summary_' + m, () => {
+      const txs = transactionsByMonth(m)
+      const incomes = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      return { month: m, incomes, expenses, balance: incomes - expenses, count: txs.length }
+    })
   }
   function allTimeSummary() {
-    const txs = Transactions.list()
-    const incomes = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    return { incomes, expenses, balance: incomes - expenses }
+    return _cachedAgg('allTime', () => {
+      const txs = Transactions.list()
+      const incomes = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      return { incomes, expenses, balance: incomes - expenses }
+    })
   }
   function accountBalance(accountId) {
-    const txs = Transactions.list().filter(t => !t.account || t.account === accountId)
-    const base = Accounts.get(accountId)
-    let balance = base ? base.balance : 0
-    balance += txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    balance -= txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    return balance
+    return _cachedAgg('acctBal_' + accountId, () => {
+      const txs = Transactions.list().filter(t => !t.account || t.account === accountId)
+      const base = Accounts.get(accountId)
+      let balance = base ? base.balance : 0
+      balance += txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      balance -= txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      return balance
+    })
   }
   function totalBalance() {
-    const accounts = Accounts.list()
-    const sum = accounts.reduce((s, a) => s + a.balance, 0)
-    const txs = Transactions.list()
-    const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    return sum + inc - exp
+    return _cachedAgg('totalBal', () => {
+      const accounts = Accounts.list()
+      const sum = accounts.reduce((s, a) => s + a.balance, 0)
+      const txs = Transactions.list()
+      const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      return sum + inc - exp
+    })
   }
   function unpaidExpenses(refDate) {
     const today = refDate || todayStr()
@@ -819,7 +843,7 @@ const DB = (() => {
     })
     return { success: true, ignored }
   }
-  function clearAllData() { Storage.clearAll(); return true }
+  function clearAllData() { Storage.clearAll(); _invalidateAgg(); return true }
 
   // ---------- init ----------
   function init() {
