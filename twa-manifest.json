@@ -1,0 +1,38 @@
+{
+  "packageId": "com.jarvis.lifeorganizer",
+  "host": "life-organizer-ashen.vercel.app",
+  "name": "Life Organizer",
+  "launcherName": "Life Org",
+  "display": "standalone",
+  "themeColor": "#1B2637",
+  "navigationColor": "#0F1620",
+  "backgroundColor": "#0F1620",
+  "enableNotifications": true,
+  "startUrl": "/index.html",
+  "iconUrl": "https://life-organizer-ashen.vercel.app/icons/icon-512.png",
+  "maskableIconUrl": "https://life-organizer-ashen.vercel.app/icons/icon-maskable.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\Anthony.melo\\life-organizer\\twa\\android.keystore",
+    "alias": "lifeorganizer"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://life-organizer-ashen.vercel.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://life-organizer-ashen.vercel.app/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

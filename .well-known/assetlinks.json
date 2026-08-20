@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.jarvis.lifeorganizer",
+      "sha256_cert_fingerprints": [
+        "36:96:F7:78:FE:40:2C:D5:13:8A:20:8D:54:0A:E2:B9:CC:B9:F5:AB:14:3F:AD:99:CF:80:11:25:FC:B9:D6:82"
+      ]
+    }
+  }
+]

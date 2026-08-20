@@ -1,7 +1,7 @@
 /* LIFE ORGANIZER — Service Worker (cache + notificações agendadas locais) */
 'use strict'
 
-const CACHE = 'lifeorganizer-v1'
+const CACHE = 'lifeorganizer-v2'
 const ASSETS = [
   './', './index.html', './manifest.json',
   './css/style.css',

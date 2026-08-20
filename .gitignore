@@ -1,0 +1,13 @@
+node_modules/
+desktop/node_modules/
+desktop/dist/
+twa/app/
+twa/build/
+twa/.gradle/
+twa/android.keystore
+twa/*.apk
+twa/app-release-signed.apk
+*.idsig
+.claude/
+.opencode/
+.playwright-mcp/

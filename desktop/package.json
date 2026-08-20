@@ -1,0 +1,43 @@
+{
+  "name": "life-organizer-desktop",
+  "version": "1.0.0",
+  "description": "Life Organizer — desktop (Electron). Organize seu dia. Controle seu dinheiro.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.jarvis.lifeorganizer",
+    "productName": "Life Organizer",
+    "files": [
+      "main.js",
+      "preload.js",
+      "../index.html",
+      "../css/**/*",
+      "../js/**/*",
+      "../icons/**/*",
+      "../manifest.json"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "../icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "ANTHONY20-melo",
+      "repo": "life-organizer"
+    }
+  }
+}
