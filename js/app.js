@@ -615,6 +615,7 @@ const App = (() => {
         <div class="mini-row"><span>Som</span><label class="switch"><input type="checkbox" id="cfg-sound" ${s.notificationPrefs.sound ? 'checked' : ''}><span class="slider"></span></label></div>
         <div class="mini-row"><span>Vibração</span><label class="switch"><input type="checkbox" id="cfg-vibrate" ${s.notificationPrefs.vibration ? 'checked' : ''}><span class="slider"></span></label></div>
       </section>
+      <section class="card"><h2>📅 Google Agenda</h2>${gcalCardHtml()}</section>
       <section class="card"><h2>💾 Dados</h2>
         <div class="modal-actions" style="justify-content:flex-start">
           <button class="btn btn-primary" data-action="export-json">⬇️ Backup completo (JSON)</button>
@@ -625,6 +626,100 @@ const App = (() => {
       </section>
     </div>`
     $('#page-config').innerHTML = html
+  }
+
+  // ---------- PÁGINA: CONFIG → Google Agenda ----------
+  function gcalCardHtml() {
+    const gs = GCAL.settings()
+    const configured = GCAL.isConfigured()
+    const authed = GCAL.isAuthed()
+    const last = gs.lastResult || {}
+    let html = ''
+    if (!configured) {
+      html += `<p class="muted">Sincronize seus eventos com o Google Agenda (duas vias).</p>
+        <div class="alert alert-warning">⚠️ Falta o Client ID do Google. Crie em <strong>console.cloud.google.com</strong> e cole em <code>js/gcal-config.js</code>.</div>
+        <button class="btn btn-ghost" data-gcal="help">📖 Como configurar</button>`
+      return html
+    }
+    if (!authed) {
+      html += `<p class="muted">Sincronize seus eventos com o Google Agenda (duas vias). Seus dados continuam privados — o token fica só no seu navegador.</p>
+        ${gs.lastEmail ? `<div class="mini-row"><span>Última conta conectada</span><strong>${esc(gs.lastEmail)}</strong></div>` : ''}
+        <button class="btn btn-primary" data-gcal="connect">🔗 Conectar ao Google Agenda</button>
+        <button class="btn btn-ghost" data-gcal="help">📖 Como configurar</button>`
+      return html
+    }
+    html += `<div class="mini-row"><span>Status</span><strong>🟢 Conectado${gs.lastEmail ? ' — ' + esc(gs.lastEmail) : ''}</strong></div>
+      <div class="mini-row"><span>Última sincronização</span><strong>${gs.lastSync ? new Date(gs.lastSync).toLocaleString('pt-BR') : 'nunca'}</strong></div>
+      ${last.sent || last.updated ? `<div class="mini-row"><span>Última sync</span><strong>${(last.sent || 0) + (last.updated || 0)} enviados · ${last.imported || 0} importados${(last.errors || []).length ? ' · ⚠️ ' + last.errors.length + ' erro(s)' : ''}</strong></div>` : ''}
+      <div class="mini-row"><span>Sincronizar ao salvar evento</span><label class="switch"><input type="checkbox" id="cfg-gcal-autosync" ${gs.autoSync ? 'checked' : ''}><span class="slider"></span></label></div>
+      <div class="modal-actions" style="justify-content:flex-start">
+        <button class="btn btn-primary" data-gcal="sync-out">⬆️ Enviar eventos → Google</button>
+        <button class="btn btn-ghost" data-gcal="sync-in">⬇️ Importar ← Google</button>
+        <button class="btn btn-ghost" data-gcal="disconnect">🚪 Desconectar</button>
+      </div>`
+    return html
+  }
+
+  function gcalHelpModal() {
+    openModal(`<h3>📅 Como conectar o Google Agenda</h3>
+      <ol class="gcal-help">
+        <li>Abra <strong>console.cloud.google.com</strong> e crie um projeto (ou use um existente).</li>
+        <li>Menu ☰ → <strong>APIs & Services</strong> → <strong>Library</strong> → procure <strong>Google Calendar API</strong> → <strong>Enable</strong>.</li>
+        <li>Vá em <strong>APIs & Services → Credentials</strong> → <strong>+ Create Credentials</strong> → <strong>OAuth client ID</strong>.</li>
+        <li>Se pedir, configure a <strong>OAuth consent screen</strong> (External, nome do app; escopos: adicione <code>https://www.googleapis.com/auth/calendar.events</code>).</li>
+        <li>Application type: <strong>Web application</strong>.</li>
+        <li><strong>Authorized JavaScript origins:</strong> <code>https://life-organizer-ashen.vercel.app</code> e <code>http://localhost:3337</code>.</li>
+        <li><strong>Authorized redirect URIs:</strong> <code>https://life-organizer-ashen.vercel.app/</code> e <code>http://localhost:3337/</code>.</li>
+        <li>Copie o <strong>Client ID</strong> (termina em <code>.apps.googleusercontent.com</code>) e cole em <code>js/gcal-config.js</code>.</li>
+        <li>Volte aqui e clique em <strong>🔗 Conectar</strong>. Na 1ª vez o Google mostra "app não verificado" — é normal (uso pessoal): clique em <strong>Avançado → Ir para o app</strong>.</li>
+      </ol>
+      <div class="modal-actions"><button class="btn btn-primary" data-close>Entendi</button></div>`, { title: 'Google Agenda' })
+  }
+
+  function gcalConnect() {
+    GCAL.getProfile().then(p => {
+      GCAL.saveSettings({ lastEmail: p.email })
+      toast('Conectado como ' + p.email + ' ✓', 'success')
+      renderConfig()
+    }).catch(err => toast(err.message || 'Conexão cancelada.', 'danger'))
+  }
+
+  function gcalSyncOut() {
+    const events = DB.Events.list()
+    if (!events.length) { toast('Nenhum evento para enviar.', 'info'); return }
+    toast('Enviando ' + events.length + ' eventos…', 'info')
+    GCAL.syncOut(events).then(out => {
+      renderConfig()
+      const n = (out.sent || 0) + (out.updated || 0)
+      if (out.errors.length) toast('Enviados ' + n + ' · ⚠️ ' + out.errors.length + ' erro(s): ' + esc(out.errors[0]), 'danger')
+      else toast('Enviados ' + n + ' eventos para o Google ✓', 'success')
+    }).catch(err => toast(err.message, 'danger'))
+  }
+
+  function gcalSyncIn() {
+    toast('Importando do Google…', 'info')
+    GCAL.syncIn().then(out => {
+      renderConfig()
+      if (out.errors.length) toast('Importados ' + out.imported + ' · atualizados ' + out.updated + ' · ⚠️ ' + out.errors.length + ' erro(s)', 'danger')
+      else toast('Importados ' + out.imported + ' · atualizados ' + out.updated + ' ✓', 'success')
+    }).catch(err => toast(err.message, 'danger'))
+  }
+
+  function handleGcalAction(act) {
+    if (act === 'help') gcalHelpModal()
+    else if (act === 'connect') gcalConnect()
+    else if (act === 'sync-out') gcalSyncOut()
+    else if (act === 'sync-in') gcalSyncIn()
+    else if (act === 'disconnect') {
+      GCAL.signOut().then(() => { GCAL.saveSettings({ lastEmail: '' }); toast('Desconectado do Google Agenda.', 'info'); renderConfig() })
+    }
+  }
+
+  // Sync automática após salvar evento (se ativada nas configurações)
+  function gcalAutoSyncEvent(ev) {
+    if (ev && GCAL.isConfigured() && GCAL.settings().autoSync) {
+      GCAL.syncOut([ev]).then(out => { if ((out.errors || []).length) toast('⚠️ Google Agenda: ' + out.errors[0], 'danger') }).catch(() => {})
+    }
   }
 
   // ---------- BUSCA ----------
@@ -807,7 +902,7 @@ const App = (() => {
       const daysSel = form.querySelector('[name="daysOfWeek"]')
       v.daysOfWeek = daysSel ? Array.from(daysSel.selectedOptions).map(o => Number(o.value)) : []
       const res = v.id ? DB.Events.update(v.id, v) : DB.Events.add(v)
-      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Evento atualizado ✓' : 'Evento criado ✓'), closeModal(), renderCurrent())
+      res && res.success === false ? toast(res.error, 'danger') : (toast(v.id ? 'Evento atualizado ✓' : 'Evento criado ✓'), closeModal(), renderCurrent(), gcalAutoSyncEvent(res))
     }
     if (kind === 'task') {
       const v = readForm(form, ['id', 'title', 'description', 'date', 'time', 'priority', 'category', 'deadline', 'status', 'recurring'])
@@ -908,7 +1003,7 @@ const App = (() => {
     const id = el.dataset.id
     if (action === 'new-event') openEventForm(null)
     else if (action === 'edit-event') openEventForm(DB.Events.get(id))
-    else if (action === 'delete-event') confirmModal('Excluir este evento?').then(ok => { if (ok) { DB.Events.remove(id); toast('Evento excluído.'); renderCurrent() } })
+    else if (action === 'delete-event') { const ev = DB.Events.get(id); confirmModal('Excluir este evento?').then(ok => { if (ok) { DB.Events.remove(id); toast('Evento excluído.'); renderCurrent(); if (ev && GCAL.isConfigured()) GCAL.deleteRemote(ev) } }) }
     else if (action === 'new-task') openTaskForm(null)
     else if (action === 'edit-task') openTaskForm(DB.Tasks.get(id))
     else if (action === 'delete-task') confirmModal('Excluir esta tarefa?').then(ok => { if (ok) { DB.Tasks.remove(id); toast('Tarefa excluída.'); renderCurrent() } })
@@ -978,8 +1073,11 @@ const App = (() => {
       if (ft) { finTab = ft.dataset.finTab; renderFinTab(); return }
       const theme = e.target.closest('[data-theme]')
       if (theme) { DB.saveSettings({ theme: theme.dataset.theme }); applyTheme(); renderConfig() }
+      const gcal = e.target.closest('[data-gcal]')
+      if (gcal) { handleGcalAction(gcal.dataset.gcal); return }
     })
     document.addEventListener('change', e => {
+      if (e.target.id === 'cfg-gcal-autosync') { GCAL.saveSettings({ autoSync: e.target.checked }); toast(e.target.checked ? 'Sync automática com o Google ativada ✓' : 'Sync automática desativada.', 'info') }
       if (e.target.id === 'fin-month') { finMonth = e.target.value || DB.monthStr(); renderFinTab() }
       if (e.target.id === 'task-filter') renderTarefas()
       if (e.target.id === 'notif-filter') renderNotificacoes()

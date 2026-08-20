@@ -85,6 +85,9 @@ const DB = (() => {
       notifyBefore: Number.isFinite(num(e.notifyBefore)) ? Math.max(0, Math.min(10080, Math.round(num(e.notifyBefore)))) : 30,
       observations: (typeof e.observations === 'string' ? e.observations : '').slice(0, 2000),
       status: e.status === 'done' ? 'done' : 'scheduled',
+      gcalEventId: typeof e.gcalEventId === 'string' ? e.gcalEventId.slice(0, 200) : '',
+      gcalSyncedAt: typeof e.gcalSyncedAt === 'string' ? e.gcalSyncedAt : '',
+      gcalImported: !!e.gcalImported,
       createdAt: e.createdAt || nowISO(),
       updatedAt: e.updatedAt || nowISO()
     }

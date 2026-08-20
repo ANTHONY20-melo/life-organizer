@@ -35,17 +35,20 @@ function loadApp(extraGlobals = {}) {
     setTimeout,
     clearTimeout,
     localStorage: createLocalStorage(),
+    window: null,
     ...extraGlobals
   }
   vm.createContext(sandbox)
-  const files = ['storage.js', 'db.js', 'insights.js', 'notifications.js', 'export.js']
+  // no browser, window === globalThis; injeta a referência circular para módulos que usam window.*
+  sandbox.window = sandbox
+  const files = ['storage.js', 'db.js', 'insights.js', 'notifications.js', 'export.js', 'gcal-config.js', 'gcal.js']
   files.forEach(f => {
     const code = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8')
     vm.runInContext(code, sandbox, { filename: f })
   })
   // const/let top-level ficam no escopo lexical do contexto (não viram propriedade do sandbox);
   // promove as exports para acesso de fora (padrão da casa).
-  ;['Storage', 'DB', 'Insights', 'Notifications', 'Export'].forEach(n => {
+  ;['Storage', 'DB', 'Insights', 'Notifications', 'Export', 'GCAL', 'GCAL_CONFIG'].forEach(n => {
     sandbox[n] = vm.runInContext(`typeof ${n} !== 'undefined' ? ${n} : undefined`, sandbox)
   })
   return sandbox
