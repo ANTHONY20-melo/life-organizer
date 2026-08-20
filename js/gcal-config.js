@@ -8,5 +8,5 @@
  * copie o "Client ID" (termina em .apps.googleusercontent.com) e cole abaixo.
  */
 window.GCAL_CONFIG = window.GCAL_CONFIG || {
-  clientId: '' // ex.: '1234567890-abc123.apps.googleusercontent.com'
+  clientId: '42294742439-1frcr4kvm54ltkotogr2uhifqsr42p0k.apps.googleusercontent.com' // ex.: '1234567890-abc123.apps.googleusercontent.com'
 }
