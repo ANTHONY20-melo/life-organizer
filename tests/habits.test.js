@@ -7,14 +7,16 @@ function fresh() { const s = loadApp(); s.DB.init(); return s }
 
 test('habitStreak conta dias consecutivos terminando hoje', () => {
   const s = fresh()
-  const h = { entries: ['2026-08-17', '2026-08-18', '2026-08-19'] }
+  const today = s.DB.todayStr()
+  const h = { entries: [s.DB.addDays(today, -2), s.DB.addDays(today, -1), today] }
   assert.strictEqual(s.DB.habitStreak(h), 3)
 })
 
 test('habitStreak: se hoje não feito, conta a partir de ontem', () => {
   const s = fresh()
-  // 16, 17, 18 são 3 dias consecutivos; hoje (19) não feito → streak = 3 (18,17,16)
-  const h = { entries: ['2026-08-16', '2026-08-17', '2026-08-18'] }
+  const today = s.DB.todayStr()
+  // hoje não feito; 3 dias consecutivos terminando ontem → streak = 3
+  const h = { entries: [s.DB.addDays(today, -3), s.DB.addDays(today, -2), s.DB.addDays(today, -1)] }
   assert.strictEqual(s.DB.habitStreak(h), 3)
 })
 

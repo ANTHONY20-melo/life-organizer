@@ -1151,6 +1151,11 @@ const App = (() => {
     bindModalEvents()
     bindGlobalClicks()
     setupSW()
+    // botões "+" (FAB flutuante + central da barra inferior) abrem o menu de adição rápida
+    const bnAdd = $('#bn-add')
+    if (bnAdd) bnAdd.addEventListener('click', showQuickActions)
+    const fab = $('#fab')
+    if (fab) fab.addEventListener('click', showQuickActions)
     const name = DB.getSettings().name
     $('#user-name').textContent = name || 'Anthony'
     document.addEventListener('keydown', e => {
